@@ -27,7 +27,18 @@ sub.on('message', (channel, message) => {
 });
 io.sockets.on('connection', (socket) => {
   socket.on('locations', (message) => {
-    console.log('w00t', message);
+    console.log('[CLIENT] New loc.', message);
+    let uid = uuid.v1();
+    let lat = message.lat;
+    let lng = message.lng;
+    
+    client.hmset(uid, [
+      'lat', lat,
+      'lng', lng
+    ], (err) => {
+      if (err) console.log(err);
+      else client.publish('locations', uid.toString());
+    });
   });
   console.log(socket.id);
 });
