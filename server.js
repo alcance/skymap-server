@@ -18,13 +18,19 @@ const io = new SocketIO.listen(server);
 const client = redis.createClient();
 client.on('connect',  () => console.log('Connected to Redis...'));
 
+
 // Socket IO
 var sub = redis.createClient(), pub = redis.createClient();
 sub.subscribe('locations');
 sub.on('message', (channel, message) => {
   console.log('New loc.', message);
 });
-io.sockets.on('connection', (socket) => console.log(socket.request));
+io.sockets.on('connection', (socket) => {
+  socket.on('locations', (message) => {
+    console.log('w00t', message);
+  });
+  console.log(socket.id);
+});
 
 // bodyParser
 app.use(bodyParser.json());
