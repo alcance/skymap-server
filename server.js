@@ -1,19 +1,24 @@
 import express from 'express';
+import http from 'http';
 import redis from 'redis';
 import bodyParser from 'body-parser';
 import uuid from 'uuid';
-import http from 'http';
 import SocketIO from 'socket.io';
+import cors from 'cors';
+
+// Setup constants
+const PORT = 8001;
+const HOST = '0.0.0.0';
 
 const app = express();
-const server = http.Server(app);
+const server = http.createServer(app);
+const io = new SocketIO.listen(server);
 
 // Create Redis client
 const client = redis.createClient();
 client.on('connect',  () => console.log('Connected to Redis...'));
 
 // Socket IO
-const io = new SocketIO(server);
 var sub = redis.createClient(), pub = redis.createClient();
 sub.subscribe('locations');
 sub.on('message', (channel, message) => {
@@ -21,13 +26,15 @@ sub.on('message', (channel, message) => {
 });
 io.sockets.on('connection', (socket) => console.log(socket.request));
 
-// Setup constants
-const PORT = 8001;
-const HOST = '0.0.0.0';
-
 // bodyParser
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended:false}));
+
+// Use CORS
+var corsOptions = {
+  origin: 'http://localhost:4200',
+};
+app.use(cors(corsOptions));
 
 // Main route
 app.get('/', (req, res, next) => res.send('Hello Skycatch!'));
@@ -54,5 +61,6 @@ app.post('/locations/add', (req, res, next) => {
 });
 
 // Listen on port 8001
-app.listen(PORT, HOST);
+// app.listen(PORT, HOST);
+server.listen(PORT); 
 console.log(`Running on http://${HOST}:${PORT}`);
