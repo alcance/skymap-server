@@ -14,9 +14,10 @@ client.on('connect',  () => console.log('Connected to Redis...'));
 
 // Socket IO
 const io = new SocketIO(server);
-client.subscribe('locations');
-client.on('message', (channel, message) => {
-  console.log(message);
+var sub = redis.createClient(), pub = redis.createClient();
+sub.subscribe('locations');
+sub.on('message', (channel, message) => {
+  console.log('New loc.', message);
 });
 io.sockets.on('connection', (socket) => console.log(socket.request));
 
@@ -47,11 +48,9 @@ app.post('/locations/add', (req, res, next) => {
     'lng', lng
   ], (err) => {
     if (err) console.log(err);
-    else {
-      client.publish('locations', uui.toString());
-      res.json(uid)
-    };
+    else client.publish('locations', uid.toString());
   });
+  res.end();
 });
 
 // Listen on port 8001
