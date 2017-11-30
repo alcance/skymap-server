@@ -2,11 +2,23 @@ import express from 'express';
 import redis from 'redis';
 import bodyParser from 'body-parser';
 import uuid from 'uuid';
+import http from 'http';
+import SocketIO from 'socket.io';
 
 const app = express();
+const server = http.Server(app);
+
 // Create Redis client
 const client = redis.createClient();
-client.on('connect',  () => console.log('Connected to Redis...'))
+client.on('connect',  () => console.log('Connected to Redis...'));
+
+// Socket IO
+const io = new SocketIO(server);
+client.subscribe('locations');
+client.on('message', (channel, message) => {
+  console.log(message);
+});
+io.sockets.on('connection', (socket) => console.log(socket.request));
 
 // Setup constants
 const PORT = 8001;
@@ -34,8 +46,11 @@ app.post('/locations/add', (req, res, next) => {
     'lat', lat,
     'lng', lng
   ], (err) => {
-    if (err) console.log(err, status);
-    else res.json(uid);
+    if (err) console.log(err);
+    else {
+      client.publish('locations', uui.toString());
+      res.json(uid)
+    };
   });
 });
 

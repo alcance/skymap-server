@@ -13,8 +13,10 @@
   "dependencies": {
     "body-parser": "^1.18.2",
     "express": "^4.16.2",
+    "http": "0.0.0",
     "morgan": "^1.9.0",
     "redis": "^2.8.0",
+    "socketio": "^1.0.0",
     "uuid": "^3.1.0"
   },
   "devDependencies": {
