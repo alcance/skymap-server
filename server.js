@@ -131,7 +131,7 @@ app.post('/locations/add', (req, res, next) => {
       res.json(response);
     });
   })
-  .catch(err => console.log(err)) 
+  .catch((err) => console.log(err)) 
 });
 
 // Listen on port 8001
