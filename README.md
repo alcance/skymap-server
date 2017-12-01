@@ -8,4 +8,4 @@ cd skymap-server
 npm install
 npm start
 ```
-- This belongs to: https://github.com/alcance/skymap-server
+- This belongs to: https://github.com/alcance/skymap-project/tree/master
