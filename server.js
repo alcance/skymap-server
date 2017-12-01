@@ -6,46 +6,45 @@ import uuid from 'uuid';
 import SocketIO from 'socket.io';
 import cors from 'cors';
 import async from 'async';
+import NodeGeocoder from 'node-geocoder';
 
 // Setup constants
 const PORT = 8001;
 const HOST = '0.0.0.0';
+const options = {
+  provider: 'google',
+  httpAdapter: 'https',
+  apiKey: 'AIzaSyBqzk9xJicW_YPEJV9P1NTKeKc4hQtiC6o',
+  formatter: null
+}
 
 const app = express();
 const server = http.createServer(app);
 const io = new SocketIO.listen(server);
+const geocoder = NodeGeocoder(options);
+
 
 // Create Redis client
 const client = redis.createClient();
 client.on('connect',  () => console.log('Connected to Redis...'));
 
-
 // Socket IO
 var sub = redis.createClient(), pub = redis.createClient();
 sub.subscribe('locations');
+
 sub.on('message', (channel, message) => {
-  console.log('New loc.', message);
+  let data = []
+  data.push(JSON.parse(message));
+  console.log('New loc.', data);
+  io.emit('added-location', data);
 });
-io.sockets.on('connection', (socket) => {
-  socket.on('locations', (message) => {
-    console.log('[CLIENT] New loc.', message);
-    let uid = uuid.v1();
-    let lat = message.lat;
-    let lng = message.lng;
-    let label = message.label;
-    let draggable = message.draggable;
-    
-    client.hmset(uid, [
-      'lat', lat,
-      'lng', lng,
-      'label', label,
-      'draggable', draggable
-    ], (err) => {
-      if (err) console.log(err);
-      else client.publish('locations', uid.toString());
-    });
+
+io.sockets.on('connection', (socket) => { 
+  console.log('[JOIN]', socket.id);
+  socket.on('disconnect', () => {
+    console.log('[QUIT]', socket.id);
+    io.emit('disconnected', socket.id);
   });
-  console.log(socket.id);
 });
 
 // bodyParser
@@ -66,7 +65,6 @@ app.get('/locations', (req, res, next) => {
   // Create a JSON response based on all Keys from Redis
   let locs = [];
   client.keys('*', (err, keys) => {
-    console.log(keys);
     if (err) return console.log(err);
     if (keys) {
       async.map(keys, (key, cb) => {
@@ -79,13 +77,17 @@ app.get('/locations', (req, res, next) => {
             loc['lng'] = Number(value.lng);
             loc['label'] = value.label;
             loc['draggable'] = !value.draggable;
+            loc['isOpen'] = value.isOpen;
             cb(null, loc);
           });
         }
       }, (err, results) => {
         if (err) return console.log(err);
-        console.log(results);
-        res.json({data:results});
+        let data = [];
+        results.forEach((location) => {
+          data.push(location);
+        })
+        res.json(data);
       })
     }
   })
@@ -93,22 +95,43 @@ app.get('/locations', (req, res, next) => {
 
 // Post a new location to Redis server
 app.post('/locations/add', (req, res, next) => {
-  let uid = uuid.v1();
-  let lat = req.body.lat;
-  let lng = req.body.lng;
-  let label = req.body.label;
-  let draggable = req.body.draggable;
-  
-  client.hmset(uid, [
-    'lat', lat,
-    'lng', lng,
-    'label', label,
-    'draggable', draggable
-  ], (err) => {
-    if (err) console.log(err);
-    else client.publish('locations', uid.toString());
-  });
-  res.end();
+  geocoder.reverse({lat:req.body.lat, lon:req.body.lng}, (err, res) => res)
+  .then((data) => {
+    console.log('dataasa', data[0].formattedAddress);
+
+    var uid = uuid.v1();
+    var location = {
+      lat: Number(req.body.lat),
+      lng: Number(req.body.lng),
+      draggable: Boolean(req.body.draggable),
+      label: data[0].formattedAddress ? data[0].formattedAddress : 'Neverland',
+      isUser: req.body.isUser ? true : false,
+      isOpen: req.body.isOpen ? 'Open Now' : 'Closed'
+    }
+
+    pub.hset(uid, [
+      'lat', location.lat,
+      'lng', location.lng,
+      'label', location.label,
+      'draggable', location.draggable,
+      'isUser', location.isUser,
+      'isOpen', location.isOpen
+    ], (err, response) => {
+      if (err) console.log(err);
+      else {
+        pub.publish('locations', JSON.stringify({
+          lat: location.lat,
+          lng: location.lng,
+          label: location.label,
+          draggable: location.draggable,
+          isUser: location.isUser,
+          isOpen: location.isOpen
+        }));
+      }
+      res.json(response);
+    });
+  })
+  .catch(err => console.log(err)) 
 });
 
 // Listen on port 8001
